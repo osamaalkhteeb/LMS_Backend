@@ -4,12 +4,17 @@ const AssignmentModel = {
   // Create a new assignment
   async create({ lessonId, title, description, deadline }) {
     try {
+      console.log('=== ASSIGNMENT MODEL CREATE DEBUG ===');
+      console.log('Received parameters:', { lessonId, title, description, deadline });
+      
       const { rows } = await query(
         `INSERT INTO assignments (lesson_id, title, description, deadline)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
         [lessonId, title, description, deadline]
       );
+      
+      console.log('Created assignment in database:', rows[0]);
       return rows[0];
     } catch (error) {
       console.error("Error creating assignment:", error);

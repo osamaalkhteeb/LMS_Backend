@@ -30,9 +30,9 @@ passport.use(
         const newUser = {
           name: profile.displayName,
           email: profile.emails[0].value,
-          oauthProvider: profile.provider,
-          oauthId: profile.id,
-          avatarUrl: profile.photos[0].value,
+          oauth_provider: profile.provider,
+          oauth_id: profile.id,
+          avatar_url: profile.photos[0].value,
         };
  
         user = await UserModel.createOAuthUser(newUser);

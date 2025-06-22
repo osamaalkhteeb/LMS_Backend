@@ -156,14 +156,20 @@ export const QuizController = {
   async createQuiz(req, res) {
     try {
       const { lessonId } = req.params;
+      console.log("Creating quiz with data:", {
+        lessonId,
+        body: req.body
+      });
       const quiz = await QuizModel.create({
         lessonId,
         ...req.body,
       });
+      console.log("Quiz created successfully:", quiz);
       res
         .status(HTTP_STATUS.CREATED)
         .json(createResponse(true, "Quiz created successfully", quiz));
     } catch (error) {
+      console.error("Error creating quiz:", error);
       res
         .status(HTTP_STATUS.SERVER_ERROR)
         .json(createResponse(false, "Failed to create quiz"));

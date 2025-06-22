@@ -3,6 +3,9 @@ import { query } from "../config/db.js";
 const LessonModel = {
   // Create a lesson
   async create({ moduleId, title, contentType, contentUrl, duration, orderNum, cloudinaryPublicId }) {
+    console.log('=== LESSON MODEL CREATE DEBUG ===');
+    console.log('Received parameters:', { moduleId, title, contentType, contentUrl, duration, orderNum, cloudinaryPublicId });
+    
     const { rows } = await query(
       `INSERT INTO lessons 
        (module_id, title, content_type, content_url, duration, order_num, cloudinary_public_id)
@@ -10,6 +13,8 @@ const LessonModel = {
        RETURNING *`,
       [moduleId, title, contentType, contentUrl, duration, orderNum, cloudinaryPublicId]
     );
+    
+    console.log('Created lesson in database:', rows[0]);
     return rows[0];
   },
 

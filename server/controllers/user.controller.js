@@ -49,7 +49,7 @@ export const UserController = {
       const updatedUser = await UserModel.updateUser(userId, {
         name: name.trim(),
         bio: bio?.trim() || null,
-        avatar_url: avatar_url?.trim() || null,
+        avatar_url: avatar_url !== undefined ? (avatar_url?.trim() || null) : currentUser.avatar_url,
         // Clear the image_public_id if avatar_url is changed manually
         image_public_id: avatar_url && avatar_url.trim() !== currentUser.avatar_url ? null : currentUser.image_public_id
       });
@@ -77,53 +77,70 @@ export const UserController = {
       const { currentPassword, newPassword } = req.body;
       const userId = req.user.id;
 
-      // Get user with password
-      const user = await UserModel.findUserByEmail(req.user.email);
+      // Get current user
+      const user = await UserModel.findUserById(userId);
+      if (!user) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json(
+          createResponse(false, "User not found")
+        );
+      }
 
-      if (!user || !user.password_hash) {
-        return res
-          .status(HTTP_STATUS.BAD_REQUEST)
-          .json(
-            createResponse(false, "Cannot change password for OAuth users")
-          );
+      // Check if user is OAuth user (no password)
+      if (user.oauth_provider) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(
+          createResponse(false, "Cannot change password for OAuth users. Your account is linked with " + user.oauth_provider + ".")
+        );
       }
 
       // Verify current password
-      const isValidPassword = await bcrypt.compare(
+      const isCurrentPasswordValid = await bcrypt.compare(
         currentPassword,
         user.password_hash
       );
-      if (!isValidPassword) {
-        return res
-          .status(HTTP_STATUS.BAD_REQUEST)
-          .json(createResponse(false, "Current password is incorrect"));
+      if (!isCurrentPasswordValid) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(
+          createResponse(false, "Current password is incorrect. Please check your current password and try again.")
+        );
       }
 
-      // Prevent using the same password
-      if (currentPassword === newPassword) {
-        return res
-          .status(HTTP_STATUS.BAD_REQUEST)
-          .json(
-            createResponse(
-              false,
-              "New password cannot be the same as the current password"
-            )
-          );
+      // Check if new password is same as current
+      const isSamePassword = await bcrypt.compare(newPassword, user.password_hash);
+      if (isSamePassword) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(
+          createResponse(false, "New password must be different from your current password.")
+        );
       }
 
       // Hash new password
-      const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
-      const hashedNewPass = await bcrypt.hash(newPassword, saltRounds);
+      const saltRounds = 12;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
 
       // Update password
-      await UserModel.updatePassword(userId, hashedNewPass);
+      await UserModel.updatePassword(userId, hashedNewPassword);
 
-      res.json(createResponse(true, "Password changed successfully"));
+      res.status(HTTP_STATUS.OK).json(
+        createResponse(true, "Password updated successfully")
+      );
     } catch (error) {
-      console.error("Change password error:", error);
-      res
-        .status(HTTP_STATUS.SERVER_ERROR)
-        .json(createResponse(false, "Failed to change password"));
+      console.error("Error changing password:", error);
+      
+      // Handle specific database errors
+      if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR') {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json(
+          createResponse(false, "Database error occurred. Please contact support.")
+        );
+      }
+      
+      // Handle validation errors that might have been missed
+      if (error.name === 'ValidationError') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(
+          createResponse(false, "Invalid password format. Please check the requirements.")
+        );
+      }
+      
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json(
+        createResponse(false, "An unexpected error occurred while changing your password. Please try again later.")
+      );
     }
   },
 
@@ -336,8 +353,8 @@ export const UserController = {
       const updatedUser = await UserModel.updateUser(userId, {
         name: currentUser.name, // Keep existing name
         bio: currentUser.bio, // Keep existing bio
-        avatarUrl: uploadResult.secure_url, // Update with new Cloudinary URL
-        imagePublic_id: uploadResult.public_id // Store the public_id for future deletion
+        avatar_url: uploadResult.secure_url, // Update with new Cloudinary URL
+        image_public_id: uploadResult.public_id // Store the public_id for future deletion
       });
 
       if (!updatedUser) {

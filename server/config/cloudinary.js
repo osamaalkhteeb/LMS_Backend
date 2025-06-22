@@ -39,20 +39,59 @@ export const uploadImage = async (imagePath, options = {}) => {
  * @param {Object} options - Additional options for the upload
  * @returns {Promise<Object>} - The upload result containing URLs and metadata
  */
-export const uploadDocument = async (documentPath, options = {}) => {
+export const uploadDocument = async (documentData, filename, options = {}) => {
   try {
-    // Set default folder and resource type for documents
+    // Set optimized default options for document uploads
     const uploadOptions = {
-      folder: 'lms_assignments',
+      folder: 'lms_lessons/documents',
       resource_type: 'raw', // Use 'raw' for non-image files
+      chunk_size: 6000000, // 6MB chunks for better upload performance
+      timeout: 60000, // 1 minute timeout for documents
       ...options
     };
     
+    // If filename is provided, use it as the public_id (preserving extension for documents)
+    if (filename) {
+      uploadOptions.public_id = filename;
+    }
+    
+    console.log('Uploading document to Cloudinary with options:', {
+      folder: uploadOptions.folder,
+      resource_type: uploadOptions.resource_type,
+      filename: filename
+    });
+    
+    let uploadData;
+    
+    // Handle different input types
+    if (Buffer.isBuffer(documentData)) {
+      // Convert Buffer to base64 data URL
+      const mimeType = filename?.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream';
+      uploadData = `data:${mimeType};base64,${documentData.toString('base64')}`;
+    } else if (typeof documentData === 'string') {
+      // Assume it's already a path or base64 string
+      uploadData = documentData;
+    } else {
+      throw new Error('Invalid document data type. Expected Buffer or string.');
+    }
+    
     // Upload the document to Cloudinary
-    const result = await cloudinary.uploader.upload(documentPath, uploadOptions);
+    const result = await cloudinary.uploader.upload(uploadData, uploadOptions);
+    
+    console.log('Document upload successful:', {
+      public_id: result.public_id,
+      bytes: result.bytes,
+      format: result.format
+    });
+    
     return result;
   } catch (error) {
     console.error('Error uploading document to Cloudinary:', error);
+    console.error('Upload options used:', {
+      folder: options.folder || 'lms_lessons/documents',
+      resource_type: options.resource_type || 'raw',
+      filename: filename
+    });
     throw error;
   }
 };
@@ -74,24 +113,57 @@ export const deleteImage = async (publicId) => {
 
 /**
  * Upload a video to Cloudinary
- * @param {string} videoPath - The path, URL or base64 string of the video to upload
+ * @param {string|Buffer} videoData - The path, URL, base64 string, or Buffer of the video to upload
+ * @param {string} filename - The original filename (used when videoData is a Buffer)
  * @param {Object} options - Additional options for the upload
  * @returns {Promise<Object>} - The upload result containing URLs and metadata
  */
-export const uploadVideo = async (videoPath, options = {}) => {
+export const uploadVideo = async (videoData, filename = null, options = {}) => {
   try {
-    // Set default folder and resource type for videos
+    // Set optimized default options for video uploads (Free tier compatible)
     const uploadOptions = {
       folder: 'lms_lessons/videos',
       resource_type: 'video',
+      quality: 'auto:low', // Lower quality for free tier
+      format: 'mp4',
+      chunk_size: 6000000, // 6MB chunks for better upload performance
+      timeout: 120000, // 2 minutes timeout
       ...options
     };
     
+    // If filename is provided, use it as the public_id (without extension)
+    if (filename) {
+      const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
+      uploadOptions.public_id = nameWithoutExt;
+    }
+    
+    console.log('Uploading video to Cloudinary with options:', {
+      folder: uploadOptions.folder,
+      quality: uploadOptions.quality,
+      format: uploadOptions.format
+    });
+    
+    // Handle Buffer data by converting to data URI
+    let uploadData = videoData;
+    if (Buffer.isBuffer(videoData)) {
+      const base64Data = videoData.toString('base64');
+      uploadData = `data:video/mp4;base64,${base64Data}`;
+    }
+    
     // Upload the video to Cloudinary
-    const result = await cloudinary.uploader.upload(videoPath, uploadOptions);
+    const result = await cloudinary.uploader.upload(uploadData, uploadOptions);
+    
+    console.log('Video upload successful:', {
+      public_id: result.public_id,
+      duration: result.duration,
+      bytes: result.bytes,
+      format: result.format
+    });
+    
     return result;
   } catch (error) {
     console.error('Error uploading video to Cloudinary:', error);
+    console.error('Upload options used:', options);
     throw error;
   }
 };

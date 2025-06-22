@@ -5,7 +5,7 @@ const UserModel = {
   async findUserByEmail(email) {
     try {
       const { rows } = await query(
-        "SELECT id, name, email, role, password_hash, oauth_provider, oauth_id,is_active FROM users WHERE email = $1",
+        "SELECT id, name, email, role, password_hash, oauth_provider, oauth_id, is_active, avatar_url, image_public_id FROM users WHERE email = $1",
         [email]
       );
       return rows[0];
@@ -33,7 +33,7 @@ const UserModel = {
   async findUserByOAuthId(oauthId) {
     try {
       const { rows } = await query(
-        "SELECT id, name, email, role, oauth_provider, oauth_id FROM users WHERE oauth_id = $1",
+        "SELECT id, name, email, role, oauth_provider, oauth_id, avatar_url, image_public_id FROM users WHERE oauth_id = $1",
         [oauthId]
       );
       return rows[0];
@@ -57,11 +57,11 @@ const UserModel = {
   },
   
   // create OAuth user
-  async createOAuthUser({ name, email, oauthProvider, oauthId, avatarUrl, role = "student" }) {
+  async createOAuthUser({ name, email, oauth_provider, oauth_id, avatar_url, role = "student" }) {
     try {
       const { rows } = await query(
         "INSERT INTO users (name, email, avatar_url, oauth_provider, oauth_id, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role, avatar_url",
-        [name, email, avatarUrl, oauthProvider, oauthId, role]
+        [name, email, avatar_url, oauth_provider, oauth_id, role]
       );
       return rows[0];
     } catch (error) {
@@ -105,20 +105,20 @@ const UserModel = {
   },
   
   // Update user
-  async updateUser(id, { name, bio, avatarUrl, imagePublic_id }) {
+  async updateUser(id, { name, bio, avatar_url, image_public_id }) {
     try {
       // If image_public_id is provided, update it along with other fields
-      if (imagePublic_id) {
+      if (image_public_id) {
         const { rows } = await query(
           "UPDATE users SET name = $1, bio = $2, avatar_url = $3, image_public_id = $4, updated_at = NOW() WHERE id = $5 RETURNING id, name, email, role, bio, avatar_url, image_public_id",
-          [name, bio, avatarUrl, imagePublic_id, id]
+          [name, bio, avatar_url, image_public_id, id]
         );
         return rows[0];
       } else {
         // Otherwise just update the regular fields
         const { rows } = await query(
           "UPDATE users SET name = $1, bio = $2, avatar_url = $3, updated_at = NOW() WHERE id = $4 RETURNING id, name, email, role, bio, avatar_url, image_public_id",
-          [name, bio, avatarUrl, id]
+          [name, bio, avatar_url, id]
         );
         return rows[0];
       }

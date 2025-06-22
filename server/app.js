@@ -13,6 +13,7 @@ import sessionConfig from "./config/session.js";
 import passport from "./config/passport.js";
 import { errorHandler } from "./middleware/error.js";
 
+
 import "./config/db.js";
 import { createResponse } from "./utils/helper.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -28,6 +29,7 @@ import assignmentRoutes from "./routes/assignment.routes.js"
 import healthRoutes from "./routes/health.routes.js"
 import debugRoutes from "./routes/debug.routes.js"
 import systemRoutes from "./routes/system.routes.js"
+
 
 
 dotenv.config();
@@ -56,8 +58,8 @@ app.use(
 
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Add this temporary debug middleware
 app.use((req, res, next) => {
@@ -79,6 +81,8 @@ app.use(session(sessionConfig));
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Performance monitoring
+
 
 // Register routes
 app.use("/api/auth", authRoutes);
@@ -94,6 +98,7 @@ app.use("/api/assignments", assignmentRoutes);
 app.use("/health", healthRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/system", systemRoutes);
+
 app.use(errorHandler);
 
 

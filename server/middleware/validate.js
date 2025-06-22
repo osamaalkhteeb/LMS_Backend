@@ -221,7 +221,7 @@ export const schema = {
   createLesson: Joi.object({
     title: Joi.string().min(3).max(150).required(),
     contentType: Joi.string().valid("video", "quiz", "text", "assignment").required(),
-    contentUrl: Joi.string().uri().when("contentType", {
+    content: Joi.string().uri().when("contentType", {
       is: Joi.string().valid("video", "text"),
       then: Joi.when(Joi.ref("$hasFile"), {
         is: true,
@@ -237,7 +237,7 @@ export const schema = {
   updateLesson: Joi.object({
     title: Joi.string().min(3).max(150).optional(),
     contentType: Joi.string().valid("video", "quiz", "text", "assignment").optional(),
-    contentUrl: Joi.string().uri().optional(),
+    content: Joi.string().uri().optional(),
     duration: Joi.number().integer().min(1).optional(),
     orderNum: Joi.number().integer().min(1).optional(),
   }).min(1),

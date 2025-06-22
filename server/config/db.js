@@ -2,6 +2,7 @@
 import dotenv from "dotenv";
 import pg from "pg";
 
+
 dotenv.config();
 
 const { Pool } = pg;
@@ -20,5 +21,6 @@ pool.connect()
   .then(() => console.log('✅ PostgreSQL connected'))
   .catch((err) => console.error('❌ PostgreSQL connection error', err));
 
+// Export query function
 export const query = (text, params) => pool.query(text, params);
 export default pool;
