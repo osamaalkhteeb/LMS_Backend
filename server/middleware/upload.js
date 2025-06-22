@@ -1,5 +1,7 @@
 import multer from 'multer';
 import path from 'path';
+import { createResponse } from '../utils/helper.js';
+import { HTTP_STATUS, SUPPORTED_FILE_TYPES } from '../config/constants.js';
 
 // Configure storage for temporary file uploads
 const storage = multer.memoryStorage();
@@ -17,33 +19,36 @@ const imageFileFilter = (req, file, cb) => {
 
 // File filter for Word documents (assignments)
 const documentFileFilter = (req, file, cb) => {
-  const allowedDocumentTypes = [
-    'application/msword', // .doc
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // .docx\
-  ];
+  const fileExtension = path.extname(file.originalname).toLowerCase();
   
-  if (allowedDocumentTypes.includes(file.mimetype)) {
+  const isDocument = SUPPORTED_FILE_TYPES.DOCUMENT.mimeTypes.includes(file.mimetype) &&
+                    SUPPORTED_FILE_TYPES.DOCUMENT.extensions.includes(fileExtension);
+  
+  if (isDocument) {
     cb(null, true);
   } else {
-    cb(new Error('Only Word documents (.doc, .docx) are allowed!'), false);
+    cb(new Error(`Only document files are allowed! ${SUPPORTED_FILE_TYPES.DOCUMENT.description}`), false);
   }
 };
 
-// File filter for lesson content (videos and PDFs)
+// File filter for lesson content (videos and documents)
 const lessonContentFilter = (req, file, cb) => {
-  const allowedTypes = [
-    'video/mp4',
-    'video/avi',
-    'video/mov',
-    'video/wmv',
-    'video/webm',
-    'application/pdf'
-  ];
+  const fileExtension = path.extname(file.originalname).toLowerCase();
   
-  if (allowedTypes.includes(file.mimetype)) {
+  // Check if it's a video file
+  const isVideo = SUPPORTED_FILE_TYPES.VIDEO.mimeTypes.includes(file.mimetype) && 
+                  SUPPORTED_FILE_TYPES.VIDEO.extensions.includes(fileExtension);
+  
+  // Check if it's a document file
+  const isDocument = SUPPORTED_FILE_TYPES.DOCUMENT.mimeTypes.includes(file.mimetype) && 
+                     SUPPORTED_FILE_TYPES.DOCUMENT.extensions.includes(fileExtension);
+  
+  if (isVideo || isDocument) {
     cb(null, true);
   } else {
-    cb(new Error('Only video files (mp4, avi, mov, wmv, webm) and PDF files are allowed!'), false);
+    const videoTypes = SUPPORTED_FILE_TYPES.VIDEO.description;
+    const documentTypes = SUPPORTED_FILE_TYPES.DOCUMENT.description;
+    cb(new Error(`Only supported file types are allowed! ${videoTypes} or ${documentTypes}`), false);
   }
 };
 
@@ -61,7 +66,7 @@ const uploadDocument = multer({
   storage: storage,
   fileFilter: documentFileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size for documents
+    fileSize: 50 * 1024 * 1024, // 50MB max file size for documents
   },
 });
 
@@ -70,9 +75,51 @@ const uploadLessonContent = multer({
   storage: storage,
   fileFilter: lessonContentFilter,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB max file size for videos and PDFs
+    fileSize: Math.max(SUPPORTED_FILE_TYPES.VIDEO.maxSize, SUPPORTED_FILE_TYPES.DOCUMENT.maxSize), // Use the larger of the two limits
   },
 });
+
+// Multer error handling middleware
+export const handleMulterError = (error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(
+        createResponse(false, `File size too large.`, null, {
+          type: 'FILE_SIZE_ERROR',
+          details: `File size exceeds the limit. ${SUPPORTED_FILE_TYPES.VIDEO.description} or ${SUPPORTED_FILE_TYPES.DOCUMENT.description}`,
+          videoLimit: SUPPORTED_FILE_TYPES.VIDEO.description,
+          documentLimit: SUPPORTED_FILE_TYPES.DOCUMENT.description
+        })
+      );
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(
+        createResponse(false, 'Too many files uploaded.', null, {
+          type: 'FILE_COUNT_ERROR',
+          details: error.message
+        })
+      );
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(
+        createResponse(false, 'Unexpected file field.', null, {
+          type: 'UNEXPECTED_FILE_ERROR',
+          details: error.message
+        })
+      );
+    }
+    // Handle other multer errors
+    return res.status(HTTP_STATUS.BAD_REQUEST).json(
+      createResponse(false, 'File upload error.', null, {
+        type: 'UPLOAD_ERROR',
+        details: error.message
+      })
+    );
+  }
+  
+  // If it's not a multer error, pass it to the next error handler
+  next(error);
+};
 
 // Export all configurations
 export { uploadImage, uploadDocument, uploadLessonContent };

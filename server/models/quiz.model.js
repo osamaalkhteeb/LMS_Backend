@@ -483,6 +483,10 @@ const QuizModel = {
   // Create a new quiz
   async create({ lessonId, title, passing_score, time_limit, max_attempts = 1, questions }) {
     try {
+      console.log("QuizModel.create called with:", {
+        lessonId, title, passing_score, time_limit, max_attempts, questions
+      });
+      
       // Start a transaction
       await query('BEGIN');
       
@@ -493,6 +497,8 @@ const QuizModel = {
          RETURNING id`,
         [lessonId, title, passing_score, time_limit, max_attempts]
       );
+      
+      console.log("Quiz inserted with ID:", quiz.id);
       
       // Create questions and options
       if (questions && questions.length > 0) {
@@ -845,9 +851,9 @@ const QuizModel = {
         course_id: row.course_id,
         question_count: row.question_count,
         // Best attempt info
-        best_attempt: row.best_score > 0 ? {
+        best_attempt: row.best_attempt_number ? {
           score: row.best_score,
-          total_score: row.question_count,
+          total_score: 100, // Score is stored as percentage (0-100)
           attempt_number: row.best_attempt_number,
           completed_at: row.best_completed_at
         } : null,

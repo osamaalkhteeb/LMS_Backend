@@ -13,20 +13,30 @@ const AssignmentController = {
       const { lessonId } = req.params;
       const { title, description, deadline } = req.body;
       
+      console.log('=== ASSIGNMENT CONTROLLER CREATE DEBUG ===');
+      console.log('Lesson ID:', lessonId);
+      console.log('Request body:', req.body);
+      console.log('Extracted data:', { title, description, deadline });
+      
       // Verify the lesson exists
       const lesson = await LessonModel.getById(lessonId);
+      console.log('Found lesson:', lesson);
       if (!lesson) {
         return res.status(HTTP_STATUS.NOT_FOUND).json(
           createResponse(false, "Lesson not found")
         );
       }
       
-      const assignment = await AssignmentModel.create({
-        lessonId,
-        title,
-        description,
-        deadline
-      });
+      const assignmentData = {
+      lessonId,
+      title,
+      description,
+      deadline
+    };
+      console.log('Creating assignment with data:', assignmentData);
+      
+      const assignment = await AssignmentModel.create(assignmentData);
+      console.log('Created assignment:', assignment);
       
       res.status(HTTP_STATUS.CREATED).json(
         createResponse(true, "Assignment created successfully", assignment)
@@ -172,7 +182,7 @@ const AssignmentController = {
           
           // Upload to Cloudinary
           const fileExtension = req.file.originalname.split('.').pop();
-          const uploadResult = await uploadDocument(base64File, {
+          const uploadResult = await uploadDocument(base64File, req.file.originalname, {
             public_id: `assignment_${id}_user_${userId}_${Date.now()}`,
             use_filename: true,
             unique_filename: false,
@@ -182,9 +192,38 @@ const AssignmentController = {
           submissionUrl = uploadResult.secure_url;
 
         } catch (uploadError) {
-          console.error('File upload error:', uploadError);
-          return res.status(HTTP_STATUS.SERVER_ERROR).json(
-            createResponse(false, "Failed to upload assignment file")
+          console.error('❌ Cloudinary upload error:', uploadError);
+          
+          // Handle specific Cloudinary errors and pass them to client
+          if (uploadError.message?.includes('File size too large')) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+              createResponse(false, 'File size exceeds the 50MB limit', null, {
+                code: 'FILE_TOO_LARGE',
+                details: 'Please compress your file or choose a smaller file',
+                cloudinaryError: uploadError.message
+              })
+            );
+          }
+          
+          // Pass Cloudinary error details to client
+          if (uploadError.http_code >= 400) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+              createResponse(false, 'Cloudinary upload failed', null, {
+                code: 'CLOUDINARY_ERROR',
+                details: uploadError.message || 'Upload service error',
+                cloudinaryError: uploadError.message,
+                httpCode: uploadError.http_code
+              })
+            );
+          }
+          
+          // For any other Cloudinary errors, pass the full error message
+          return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json(
+            createResponse(false, 'Upload failed', null, {
+              code: 'UPLOAD_ERROR',
+              details: uploadError.message || 'Unknown upload error',
+              cloudinaryError: uploadError.message
+            })
           );
         }
       } else if (hasUrl) {
